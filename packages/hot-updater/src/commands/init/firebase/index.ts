@@ -13,12 +13,7 @@ const firebaseDir = path.join(
   ),
   "firebase",
 );
-const rootDir = getCwd();
 const hotUpdaterDir = path.resolve(".hot-updater");
-const { tmpDir, removeTmpDir } = await copyDirToTmp(firebaseDir);
-const functionsDir = path.join(tmpDir, "functions");
-const oldPackagePath = path.join(functionsDir, "_package.json");
-const newPackagePath = path.join(functionsDir, "package.json");
 
 const CONFIG_TEMPLATE = `
 import { metro } from "@hot-updater/metro";
@@ -58,7 +53,7 @@ async function setupFirebaseEnv(webAppId: string) {
       HOT_UPDATER_FIREBASE_STORAGE_BUCKET: firebaseConfig.storageBucket,
     };
 
-    await makeEnv(newEnvVars, path.join(rootDir, ".env"));
+    await makeEnv(newEnvVars, path.join(getCwd(), ".env"));
   } catch (error) {
     console.error("error in firebase apps:sdkconfig", error);
   }
@@ -67,34 +62,63 @@ async function setupFirebaseEnv(webAppId: string) {
 export const initFirebase = async () => {
   const initializeVariable = await initFirebaseUser();
 
+  const { tmpDir, removeTmpDir } = await copyDirToTmp(firebaseDir);
+  const functionsDir = path.join(tmpDir, "functions");
+  const oldPackagePath = path.join(functionsDir, "_package.json");
+  const newPackagePath = path.join(functionsDir, "package.json");
+
+  const spin = p.spinner();
+
   try {
     await fs.rename(oldPackagePath, newPackagePath);
   } catch (error) {
     console.error("error in changing file name:", error);
   }
 
-  const spin = p.spinner();
-  spin.start("install funcions modules, It's likely to take a while ...");
+  const indexTsPath = path.join(functionsDir, "index.ts");
+  const tsconfigPath = path.join(functionsDir, "tsconfig.json");
 
   try {
-    await execa("npm", ["install"], { cwd: functionsDir });
+    await fs.rm(indexTsPath);
+  } catch (error) {
+    console.error(`Error deleting ${indexTsPath}:`, error);
+  }
+
+  try {
+    await fs.rm(tsconfigPath);
+  } catch (error) {
+    console.error(`Error deleting ${tsconfigPath}:`, error);
+  }
+
+  try {
+    await execa("npm", ["install", "-g", "firebase-tools"], { cwd: getCwd() });
   } catch (error) {
     console.error("error in npm install", error);
   }
 
-  spin.stop("Success!");
-
   try {
-    await execa("firebase", ["use", "--add", initializeVariable.projectId], {
-      cwd: hotUpdaterDir,
-    });
+    await execa("pnpm", ["install"], { cwd: functionsDir });
+  } catch (error) {
+    console.error("error in npm install", error);
+  }
+
+  spin.start(`firebase use --add ${initializeVariable.projectId}:`);
+  try {
+    const a = await execa(
+      "firebase",
+      ["use", "--add", initializeVariable.projectId],
+      {
+        cwd: hotUpdaterDir,
+      },
+    );
+    spin.stop(`${a}`);
   } catch (error) {
     console.error("error in firebase use --add:", error);
   }
 
   setupFirebaseEnv(initializeVariable.webAppId);
 
-  await execa("firebase", ["deploy"], {
+  await execa("firebase", ["deploy", "--non-interactive"], {
     cwd: hotUpdaterDir,
     stdio: "inherit",
   });

@@ -1,12 +1,10 @@
+import { initFirebase } from "@/commands/init/firebase";
+import { initSupabase } from "@/commands/init/supabase";
 import { printBanner } from "@/components/banner";
+import { ensureInstallPackages } from "@/utils/ensureInstallPackages";
 import { isCancel, select } from "@clack/prompts";
 import { initAwsS3LambdaEdge } from "./init/aws";
 import { initCloudflareD1R2Worker } from "./init/cloudflareD1R2Worker";
-
-import { initFirebase } from "@/commands/init/firebase";
-import { initSupabase } from "@/commands/init/supabase";
-import { ensureInstallPackages } from "@/utils/ensureInstallPackages";
-import { initFirebase } from "./init/firebase";
 
 const REQUIRED_PACKAGES = {
   dependencies: ["@hot-updater/react-native"],
@@ -28,7 +26,7 @@ const PACKAGE_MAP = {
   },
   firebase: {
     dependencies: [],
-    devDependencies: ["firebase-tools"],
+    devDependencies: ["firebase-tools", "@google-cloud/functions-framework"],
   },
 } as const;
 
